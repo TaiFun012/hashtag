@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Карта локаций — Хештег</title>
+    <link rel="stylesheet" href="main.css">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+
+    <header class="header">
+        <div class="logo">
+            <img src="./Assets/logo.svg" alt="Логотип" class="logo-img">
+        </div>
+        
+        <nav class="nav">
+            <a href="index.html" class="nav-link ">Главная</a>
+            <a href="profile.html" class="nav-link" id="nav-profile-link">Профиль</a>
+            <a href="map.html" class="nav-link active">Карта локаций</a>
+        </nav>
+
+        <div class="auth-actions">
+            <button id="btn-clear-points" class="btn btn-clear">Очистить точки</button>
+            <button id="btn-toggle-mode" class="btn btn-mode">Режим отметки</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <main class="map-page">
+            <h1 class="page-title">Карта локаций</h1>
+
+            <div class="map-wrap">
+                <div id="map"></div>
+            </div>
+
+            <div class="map-controls">
+                <p class="map-hint">
+                    Включи <span class="map-hint-strong" id="hint-toggle">режим отметки</span>, кликни по карте и добавь свою точку
+                </p>
+                <div class="map-stats">
+                    Точек на карте: <span class="map-stats-value">0</span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <footer class="footer">
+        <div class="footer-logo">
+            <img src="./Assets/logo.svg" alt="Логотип" class="logo-img">
+        </div>
+        <p class="copyright">© 2026 Хештег. База геоточек для фотографов. Все права защищены.</p>
+        <div class="socials">
+            <a href="#" class="social-link"><img src="./Assets/vk.svg" alt="VK"></a>
+            <a href="#" class="social-link"><img src="./Assets/rutube.svg" alt="rutube"></a>
+            <a href="#" class="social-link"><img src="./Assets/max-messenger.svg" alt="max"></a>
+        </div>
+    </footer>
+
+    <div class="modal-overlay" id="authModalOverlay">
+        <div class="modal">
+            <button class="close-btn" id="closeAuthModal" type="button">&times;</button>
+            
+            <div class="tabs">
+                <button type="button" class="tab-btn active" data-target="login">Войти</button>
+                <button type="button" class="tab-btn" data-target="register">Зарегистрироваться</button>
+            </div>
+
+            <div id="auth-error-msg" style="display: none; color: #ff4d4d; background: rgba(255, 77, 77, 0.1); padding: 12px; border-radius: 10px; margin-bottom: 20px; text-align: center; font-size: 14px;"></div>
+
+            <form class="form-content active" id="login" onsubmit="handleFormSubmit(event, 'login')">
+                <div class="input-wrapper">
+                    <input type="text" placeholder="Логин" class="login-mask" id="login-input" required>
+                </div>
+                <div class="input-wrapper">
+                    <input type="password" placeholder="Пароль" class="password-input" id="login-password" required>
+                    <button type="button" class="toggle-password" aria-label="Показать пароль">
+                        <img src="./Assets/password free.png" alt="" class="eye-icon">
+                    </button>
+                </div>
+                <button type="submit" class="submit-btn">Войти</button>
+            </form>
+
+            <form class="form-content" id="register" onsubmit="handleFormSubmit(event, 'register')">
+                <div class="input-wrapper">
+                    <input type="text" placeholder="Введите ФИО" id="reg-fio" required>
+                </div>
+                <div class="input-wrapper">
+                    <input type="text" placeholder="Введите никнейм" id="reg-nickname" required>
+                </div>
+                <div class="input-wrapper">
+                    <input type="text" placeholder="Логин" class="login-mask" id="reg-login" required>
+                </div>
+                <div class="input-wrapper">
+                    <input type="password" placeholder="Пароль" class="password-input" id="reg-password" required>
+                    <button type="button" class="toggle-password" aria-label="Показать пароль">
+                        <img src="./Assets/password free.png" alt="" class="eye-icon">
+                    </button>
+                </div>
+                <div class="input-wrapper">
+                    <input type="password" placeholder="Повторите пароль" class="password-input" id="reg-confirm-password" required>
+                    <button type="button" class="toggle-password" aria-label="Показать пароль">
+                        <img src="./Assets/password free.png" alt="" class="eye-icon">
+                    </button>
+                </div>
+                
+                <div class="register-buttons">
+                    <button type="submit" class="submit-btn">Зарегистрироваться</button>
+                    <button type="button" class="submit-btn">Войти через ВК</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const map = L.map('map', {
+            attributionControl: false
+        }).setView([56.3269, 44.0059], 12);
+
+        L.tileLayer('https://tile.openstreetmap.de/{z}/{x}/{y}.png', {
+            maxZoom: 19
+        }).addTo(map);
+
+        const DEFAULT_LOCATIONS = [
+            { name: 'Чкаловская лестница', tag: 'Вечернее фото', coords: [56.3344, 44.0038], mine: false },
+            { name: 'Р.п. Первомайский', tag: 'Рассвет', coords: [56.2250, 43.8500], mine: false },
+            { name: 'Сормово', tag: 'Стрит фото', coords: [56.3230, 43.8560], mine: false },
+            { name: 'Канавинский мост', tag: 'Солнечный день', coords: [56.3200, 43.9950], mine: false }
+        ];
+
+        function loadLocations() {
+            try {
+                const raw = JSON.parse(localStorage.getItem('hashtags_locations'));
+                if (Array.isArray(raw)) return raw;
+            } catch (e) {}
+            return DEFAULT_LOCATIONS.slice();
+        }
+
+        function saveLocations() {
+            localStorage.setItem('hashtags_locations', JSON.stringify(locations));
+        }
+
+        const locations = loadLocations();
+        const pinIcon = L.divIcon({
+            className: 'custom-pin-wrapper',
+            html: '<div class="custom-pin"></div>',
+            iconSize: [26, 26],
+            iconAnchor: [13, 26]
+        });
+
+        locations.forEach(loc => {
+            L.marker(loc.coords, { icon: pinIcon }).addTo(map);
+        });
+
+        const counter = document.querySelector('.map-stats-value');
+        if (counter) {
+            counter.textContent = locations.length;
+        }
+
+        const clearBtn = document.getElementById('btn-clear-points');
+        const toggleBtn = document.getElementById('btn-toggle-mode');
+        let isMarkingMode = false;
+
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                map.eachLayer((layer) => {
+                    if (layer instanceof L.Marker) map.removeLayer(layer);
+                });
+                locations.length = 0;
+                saveLocations();
+                if (counter) counter.textContent = '0';
+                if (isMarkingMode) {
+                    isMarkingMode = false;
+                    toggleBtn.textContent = 'Режим отметки';
+                    toggleBtn.style.backgroundColor = '';
+                    map.off('click', handleMapClick);
+                }
+            });
+        }
+
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', () => {
+                isMarkingMode = !isMarkingMode;
+                if (isMarkingMode) {
+                    toggleBtn.textContent = 'Режим отметки: АКТИВЕН';
+                    toggleBtn.style.backgroundColor = '#D63E59';
+                    map.once('click', handleMapClick);
+                } else {
+                    toggleBtn.textContent = 'Режим отметки';
+                    toggleBtn.style.backgroundColor = '';
+                    map.off('click', handleMapClick);
+                }
+            });
+        }
+
+        const hintToggle = document.getElementById('hint-toggle');
+        if (hintToggle) {
+            hintToggle.addEventListener('click', () => toggleBtn.click());
+        }
+
+        function handleMapClick(e) {
+            const latlng = e.latlng;
+            L.marker(latlng, { icon: pinIcon }).addTo(map);
+            locations.push({
+                name: `Точка ${locations.length + 1}`,
+                coords: [latlng.lat, latlng.lng],
+                tag: 'Без описания',
+                mine: true
+            });
+            saveLocations();
+            if (counter) counter.textContent = locations.length;
+            isMarkingMode = false;
+            toggleBtn.textContent = 'Режим отметки';
+            toggleBtn.style.backgroundColor = '';
+        }
+
+        const isLoggedIn = localStorage.getItem('hashtag_logged_in') === 'true';
+        const navProfileLink = document.getElementById('nav-profile-link');
+        const modalOverlay = document.getElementById('authModalOverlay');
+        const errorMsgBlock = document.getElementById('auth-error-msg');
+
+        navProfileLink.addEventListener('click', function(e) {
+            if (!isLoggedIn) {
+                e.preventDefault();
+                modalOverlay.classList.add('active');
+                errorMsgBlock.style.display = 'none';
+                document.querySelector('.tab-btn[data-target="login"]').click();
+            }
+        });
+
+        function initAuthLogic() {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.form-content').forEach(f => f.classList.remove('active'));
+                    this.classList.add('active');
+                    document.getElementById(this.getAttribute('data-target')).classList.add('active');
+                    errorMsgBlock.style.display = 'none';
+                });
+            });
+
+            document.querySelectorAll('.login-mask').forEach(input => {
+                input.addEventListener('input', function() {
+                    this.value = this.value.replace(/[^a-zA-Z0-9_.@-]/g, '');
+                });
+            });
+
+             const EYE_OPEN = './Assets/password free.png';
+            const EYE_CLOSED = './Assets/password lock.png';
+
+            document.querySelectorAll('.toggle-password').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const input = this.parentElement.querySelector('.password-input');
+                    const icon = this.querySelector('.eye-icon');
+                    if (input.type === 'password') {
+                        input.type = 'text';
+                        icon.src = EYE_CLOSED;
+                    } else {
+                        input.type = 'password';
+                        icon.src = EYE_OPEN;
+                    }
+                });
+            });
+
+            document.getElementById('closeAuthModal').addEventListener('click', () => {
+                modalOverlay.classList.remove('active');
+            });
+            
+            modalOverlay.addEventListener('click', (e) => {
+                if (e.target.id === 'authModalOverlay') {
+                    modalOverlay.classList.remove('active');
+                }
+            });
+        }
+
+        initAuthLogic();
+
+        function handleFormSubmit(event, formType) {
+            event.preventDefault(); 
+            errorMsgBlock.style.display = 'none';
+
+            if (formType === 'register') {
+                const fio = document.getElementById('reg-fio').value;
+                const nickname = document.getElementById('reg-nickname').value;
+                const login = document.getElementById('reg-login').value;
+                const pass = document.getElementById('reg-password').value;
+                const confirmPass = document.getElementById('reg-confirm-password').value;
+
+                if (pass !== confirmPass) {
+                    errorMsgBlock.textContent = 'Пароли не совпадают!';
+                    errorMsgBlock.style.display = 'block';
+                    return;
+                }
+
+                const user = { fio, nickname, login, password: pass };
+                localStorage.setItem('hashtag_user', JSON.stringify(user));
+                localStorage.setItem('hashtag_logged_in', 'true');
+                window.location.href = 'profile.html';
+
+            } else if (formType === 'login') {
+                const login = document.getElementById('login-input').value;
+                const pass = document.getElementById('login-password').value;
+                const storedUser = JSON.parse(localStorage.getItem('hashtag_user'));
+
+                if (!storedUser) {
+                    errorMsgBlock.textContent = 'У вас нет зарегистрированного аккаунта.';
+                    errorMsgBlock.style.display = 'block';
+                    return;
+                }
+
+                if (storedUser.login === login && storedUser.password === pass) {
+                    localStorage.setItem('hashtag_logged_in', 'true');
+                    window.location.href = 'profile.html';
+                } else {
+                    errorMsgBlock.textContent = 'Неверный логин или пароль.';
+                    errorMsgBlock.style.display = 'block';
+                }
+            }
+        }
+    </script>
+
+</body>
+</html>
